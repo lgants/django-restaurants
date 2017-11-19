@@ -1,75 +1,98 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import render
-from django.views.generic import View, ListView, DetailView, CreateView, UpdateView
+from django.contrib.messages.views import SuccessMessageMixin
+from django.http import Http404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.generic import CreateView, DetailView, View
+# Create your views here.
+from menus.models import Item
+from restaurants.models import RestaurantLocation
 
-from .forms import ItemForm
-from .models import Item
-
-class HomeView(View):
-    def get(self, request, *args, **kwargs):
-        if not request.user.is_authenticated():
-            object_list = Item.objects.filter(public=True).order_by('-timestamp')
-            return render(request, "home.html", {"object_list": object_list})
-
-        user = request.user
-        is_following_user_ids = [x.user.id for x in user.is_following.all()]
-        qs = Item.objects.filter(user__id__in=is_following_user_ids, public=True).order_by("-updated")[:3]
-        return render(request, "menus/home-feed.html", {'object_list': qs})
+from .forms import RegisterForm
+from .models import Profile
+User = get_user_model()
 
 
+def activate_user_view(request, code=None, *args, **kwargs):
+    if code:
+        qs = Profile.objects.filter(activation_key=code)
+        if qs.exists() and qs.count() == 1:
+            profile = qs.first()
+            if not profile.activated:
+                user_ = profile.user
+                user_.is_active = True
+                user_.save()
+                profile.activated=True
+                profile.activation_key=None
+                profile.save()
+                return redirect("/login")
+    return redirect("/login")
 
-class AllUserRecentItemListView(ListView):
-    template_name = 'home.html'
-    def get_queryset(self):
-        return Item.objects.filter(user__is_active=True)
 
 
-class ItemListView(LoginRequiredMixin, ListView):
-    def get_queryset(self):
-        return Item.objects.filter(user=self.request.user)
+class RegisterView(SuccessMessageMixin, CreateView):
+    form_class = RegisterForm
+    template_name = 'registration/register.html'
+    success_url = '/'
+    success_message = "Your account was created successfully. Please check your email."
+
+    def dispatch(self, *args, **kwargs):
+        # if self.request.user.is_authenticated():
+        #     return redirect("/logout")
+        return super(RegisterView, self).dispatch(*args, **kwargs)
 
 
-class ItemDetailView(LoginRequiredMixin, DetailView):
-    def get_queryset(self):
-        return Item.objects.filter(user=self.request.user)
+
+class ProfileFollowToggle(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        username_to_toggle = request.POST.get("username")
+        profile_, is_following = Profile.objects.toggle_follow(request.user, username_to_toggle)
+        return redirect(f"/u/{profile_.user.username}/")
 
 
-class ItemCreateView(LoginRequiredMixin, CreateView):
-    template_name = 'form.html'
-    form_class = ItemForm
 
-    def form_valid(self, form):
-        obj = form.save(commit=False)
-        obj.user = self.request.user
-        return super(ItemCreateView, self).form_valid(form)
+class RandomProfileDetailView(DetailView):
+    template_name = 'profiles/user.html'
 
-    def get_form_kwargs(self):
-        kwargs = super(ItemCreateView, self).get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
-
-    def get_queryset(self):
-        return Item.objects.filter(user=self.request.user)
+    def get_object(self):
+        return User.objects.filter(is_active=True, item__isnull=False).order_by("?").first() #/ gives a random item.
 
     def get_context_data(self, *args, **kwargs):
-        context = super(ItemCreateView, self).get_context_data(*args, **kwargs)
-        context['title'] = 'Create Item'
+        context = super(RandomProfileDetailView, self).get_context_data(*args, **kwargs)
+        user = context['user']
+        is_following = False
+        if self.request.user.is_authenticated():
+            if user.profile in self.request.user.is_following.all():
+                is_following = True
+        context['is_following'] = is_following
+        query = self.request.GET.get('q')
+        items_exists = Item.objects.filter(user=user).exists()
+        qs = RestaurantLocation.objects.filter(owner=user).search(query)
+        if items_exists and qs.exists():
+            context['locations'] = qs
         return context
 
 
-class ItemUpdateView(LoginRequiredMixin, UpdateView):
-    template_name = 'menus/detail-update.html'
-    form_class = ItemForm
+class ProfileDetailView(DetailView):
+    template_name = 'profiles/user.html'
 
-    def get_queryset(self):
-        return Item.objects.filter(user=self.request.user)
+    def get_object(self):
+        username = self.kwargs.get("username")
+        if username is None:
+            raise Http404
+        return get_object_or_404(User, username__iexact=username, is_active=True)
 
     def get_context_data(self, *args, **kwargs):
-        context = super(ItemUpdateView, self).get_context_data(*args, **kwargs)
-        context['title'] = 'Update Item'
+        context = super(ProfileDetailView, self).get_context_data(*args, **kwargs)
+        user = context['user']
+        is_following = False
+        if self.request.user.is_authenticated():
+            if user.profile in self.request.user.is_following.all():
+                is_following = True
+        context['is_following'] = is_following
+        query = self.request.GET.get('q')
+        items_exists = Item.objects.filter(user=user).exists()
+        qs = RestaurantLocation.objects.filter(owner=user).search(query)
+        if items_exists and qs.exists():
+            context['locations'] = qs
         return context
-
-    def get_form_kwargs(self):
-        kwargs = super(ItemUpdateView, self).get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
