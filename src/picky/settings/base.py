@@ -27,6 +27,17 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST_USER = 'logan@email.com'
+EMAIL_HOST_PASSWORD = 'password'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = 'Logan <logan@email.com>'
+
+ADMINS = (
+    ('Logan', 'logan@email.com'),
+)
+MANAGERS = ADMINS
 
 # Application definition
 
@@ -37,8 +48,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    'restaurants'
+
+    'menus',
+    'profiles',
+    'restaurants',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +65,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'picky.urls'
+LOGIN_URL = '/login/'
 
 TEMPLATES = [
     {
@@ -120,3 +134,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
+
+LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/'
+
+CORS_REPLACE_HTTPS_REFERER      = False
+HOST_SCHEME                     = "http://"
+SECURE_PROXY_SSL_HEADER         = None
+SECURE_SSL_REDIRECT             = False
+SESSION_COOKIE_SECURE           = False
+CSRF_COOKIE_SECURE              = False
+SECURE_HSTS_SECONDS             = None
+SECURE_HSTS_INCLUDE_SUBDOMAINS  = False
+SECURE_FRAME_DENY               = False
