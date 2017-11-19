@@ -2,11 +2,25 @@
 <html lang=en>
 
 <head>
+<title>{% block head_title %}MuyPicky.com{% endblock head_title %}</title>
+{% include 'snippets/css.html' %}
 </head>
-
 <body>
-  <h2>Hello World</h2>
-  <p>
-    Yo
-  </p>
+{% include 'snippets/nav.html' %}
+{% if messages %}
+<div class="alert messages text-center">
+    {% for message in messages %}
+    <b>{{ message }}</b><br/>
+    {% endfor %}
+
+</div>
+{% endif %}
+
+<div class='container'>
+{% block content %}{% endblock content %}
+</div>
+
+
+{% include 'snippets/js.html' %}
 </body>
+</html>
